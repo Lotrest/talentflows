@@ -66,8 +66,14 @@ class HHAdapter(PlatformAdapter):
         query: str,
         per_page: int = 50,
     ) -> list[PlatformVacancy]:
+        # Build search query: keywords + top skills for better matching
+        search_text = query
+        if user.skills:
+            top_skills = " ".join(user.skills[:5])
+            search_text = f"{query} {top_skills}".strip()
+
         params: dict = {
-            "text": query,
+            "text": search_text,
             "area": "1",
             "per_page": per_page,
             "page": 0,
@@ -76,6 +82,23 @@ class HHAdapter(PlatformAdapter):
         if user.salary_from:
             params["salary"] = user.salary_from
             params["only_with_salary"] = "true"
+
+        # Map user experience to HH experience filter
+        exp_years = user.experience_years or 0
+        if exp_years == 0:
+            params["experience"] = "noExperience"
+        elif exp_years < 3:
+            params["experience"] = "between1And3"
+        elif exp_years < 6:
+            params["experience"] = "between3And6"
+        else:
+            params["experience"] = "moreThan6"
+
+        # Map work formats to HH schedule filter (pick first preferred)
+        fmt_map = {"remote": "remote", "office": "fullDay", "hybrid": "flexible"}
+        formats = user.work_formats or []
+        if formats and formats[0] in fmt_map:
+            params["schedule"] = fmt_map[formats[0]]
 
         async with httpx.AsyncClient() as client:
             resp = await client.get(

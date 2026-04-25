@@ -210,6 +210,11 @@ async def draft_reply(
         conversation_history=history,
         tone=current_user.tone,
         custom_instructions=current_user.custom_instructions,
+        user_skills=current_user.skills or [],
+        user_experience=current_user.experience_years,
+        target_role=current_user.target_role,
+        salary_from=current_user.salary_from,
+        salary_to=current_user.salary_to,
     )
 
     draft_msg = Message(

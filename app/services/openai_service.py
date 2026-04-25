@@ -274,8 +274,10 @@ REPLY_SYSTEM = """Ты — AI-помощник для поиска работы.
 Правила:
 - 2-4 предложения, максимум 80 слов
 - Отвечай по существу на вопрос работодателя
-- Подтверди интерес + добавь конкретику
-- Не повторяй шаблоны из сопроводительного
+- Если работодатель спрашивает про навыки/опыт — используй КОНКРЕТНЫЕ навыки из профиля кандидата
+- Если спрашивают про зарплату — отвечай на основе ожиданий кандидата
+- Подтверди интерес + добавь конкретику из профиля
+- Пиши как живой человек, не как бот
 - НЕ пиши "буду рад" "надеюсь на сотрудничество"
 - Возвращай только текст ответа"""
 
@@ -287,6 +289,11 @@ async def draft_reply(
     conversation_history: list[dict],
     tone: str,
     custom_instructions: str | None,
+    user_skills: list[str] | None = None,
+    user_experience: int | None = None,
+    target_role: str | None = None,
+    salary_from: int | None = None,
+    salary_to: int | None = None,
 ) -> str:
     tone_guide = {
         "professional": "деловой стиль",
@@ -303,13 +310,26 @@ async def draft_reply(
 
     custom_note = f"\nПожелания: {custom_instructions}" if custom_instructions else ""
 
-    prompt = f"""Вакансия: {vacancy_title} в {company}
+    skills_text = ", ".join((user_skills or [])[:12]) or "не указаны"
+    salary_text = ""
+    if salary_from:
+        salary_text = f"от {salary_from:,} ₽"
+        if salary_to:
+            salary_text += f" до {salary_to:,} ₽"
+
+    prompt = f"""Профиль кандидата:
+Целевая роль: {target_role or vacancy_title}
+Опыт: {user_experience or '?'} лет
+Навыки: {skills_text}
+Зарплатные ожидания: {salary_text or 'не указаны'}
+
+Вакансия: {vacancy_title} в {company}
 Тон: {tone_guide}{custom_note}{history_text}
 
 Новое сообщение работодателя:
 {employer_message}
 
-Напиши ответ кандидата:"""
+Напиши ответ кандидата, опираясь на его реальные навыки и опыт:"""
 
     try:
         response = await client.chat.completions.create(

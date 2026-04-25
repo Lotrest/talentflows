@@ -89,6 +89,12 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def build_database_url(self):
         if self.database_url:
+            # Railway provides postgresql:// — asyncpg needs postgresql+asyncpg://
+            url = self.database_url
+            if url.startswith("postgresql://") or url.startswith("postgres://"):
+                url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+                url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+            self.database_url = url
             return self
         self.database_url = (
             f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
