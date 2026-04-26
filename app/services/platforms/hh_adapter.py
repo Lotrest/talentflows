@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 from app.models.user import User
 from app.services.platforms.base import PlatformAdapter, PlatformVacancy, PlatformVacancyDetail, PlatformResume
 
-HH_API_BASE = "https://api.hh.ru"
+HH_API_BASE = "https://hh-proxy.akuninm2.workers.dev"
 HH_AUTH_URL = "https://hh.ru/oauth/authorize"
 HH_TOKEN_URL = "https://hh.ru/oauth/token"
 HH_HEADERS = {"HH-User-Agent": "TalentFlows/1.0 (akuninm2@gmail.com)"}
@@ -76,9 +76,14 @@ class HHAdapter(PlatformAdapter):
 
         schedule_map = {"remote": "remote", "fullDay": "office", "flexible": "hybrid", "shift": "office"}
 
-        # Try suitable_vacancies endpoint first (requires auth, bypasses IP restrictions on public search)
+        # Try suitable_vacancies endpoint (requires auth, bypasses IP restrictions on public search)
         if "Authorization" in auth_headers:
-            resumes = await self.get_resumes(connection)
+            try:
+                resumes = await self.get_resumes(connection)
+            except Exception as e:
+                logger.warning("HH get_resumes failed (IP block?): %s", e)
+                resumes = []
+
             if resumes:
                 resume_id = resumes[0].id
                 logger.info("HH: using suitable_vacancies for resume=%s", resume_id)
@@ -122,6 +127,9 @@ class HHAdapter(PlatformAdapter):
                 headers=auth_headers,
             )
             logger.info("HH /vacancies status=%s url=%s", resp.status_code, resp.url)
+            if resp.status_code == 403:
+                logger.warning("HH /vacancies 403 — Railway IP blocked, returning empty. Use a proxy or Russian hosting to fix.")
+                return []
             if not resp.is_success:
                 logger.error("HH /vacancies error body: %s", resp.text)
                 resp.raise_for_status()
