@@ -19,14 +19,18 @@ class JoobleAdapter(PlatformAdapter):
         if not settings.jooble_api_key:
             return []
 
+        _CIS_CITIES = {"москва", "moscow", "санкт-петербург", "спб", "almaty", "алматы", "астана", "минск", "киев", "київ"}
+
+        location = "Poland"
+        if user.city and user.city.lower() not in _CIS_CITIES:
+            location = user.city
+
         body: dict = {
-            "keywords": query,
+            "keywords": query or "developer",
+            "location": location,
+            "page": 1,
             "resultonpage": min(per_page, 20),
         }
-        if user.city:
-            body["location"] = user.city
-        if user.salary_from:
-            body["salary"] = user.salary_from
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -36,6 +40,12 @@ class JoobleAdapter(PlatformAdapter):
                 )
                 resp.raise_for_status()
                 data = resp.json()
+                if not data.get("jobs"):
+                    # fallback: broaden search
+                    fallback_body = {"keywords": "developer", "location": "Poland", "page": 1, "resultonpage": 20}
+                    resp = await client.post(f"{self._API_BASE}/{settings.jooble_api_key}", json=fallback_body)
+                    resp.raise_for_status()
+                    data = resp.json()
         except Exception:
             return []
 
