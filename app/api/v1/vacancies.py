@@ -1,6 +1,7 @@
 import logging
 import asyncio
 from fastapi import APIRouter, Depends, Query, BackgroundTasks, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update
 from app.core.database import get_db, AsyncSessionLocal
@@ -93,6 +94,39 @@ async def scan_vacancies(
     background_tasks.add_task(_scan_and_score, current_user.id, platform)
     logger.info("scan started: user=%s platform=%s", current_user.id, platform)
     return {"ok": True, "message": "Scan started"}
+
+
+class VacancyIngestItem(BaseModel):
+    external_id: str
+    title: str
+    company: str
+    salary_from: int | None = None
+    salary_to: int | None = None
+    salary_currency: str | None = "RUR"
+    city: str | None = None
+    work_format: str | None = None
+    url: str | None = None
+    description: str | None = None
+    skills_required: list[str] = []
+
+
+@router.post("/ingest")
+async def ingest_vacancies(
+    items: list[VacancyIngestItem],
+    background_tasks: BackgroundTasks,
+    platform: str = Query("hh"),
+    current_user: User = Depends(get_current_user),
+):
+    """Accept vacancy list fetched client-side (browser bypasses IP block), score and save in background."""
+    if not items:
+        return {"ok": True, "received": 0}
+    background_tasks.add_task(
+        _ingest_and_score,
+        current_user.id,
+        platform,
+        [i.model_dump() for i in items],
+    )
+    return {"ok": True, "received": len(items)}
 
 
 @router.post("/{vacancy_id}/approve")
@@ -299,3 +333,86 @@ async def _scan_and_score(user_id: str, platform: str):
                 for v in top_vacs
             ]
             await send_new_vacancies_digest(user.email, user.name, new_count, top_data)
+
+
+async def _ingest_and_score(user_id: str, platform: str, raw_items: list[dict]):
+    """Background task: save pre-fetched vacancies (from browser) and score with AI."""
+    logger.info("_ingest_and_score start: user=%s platform=%s count=%d", user_id, platform, len(raw_items))
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        if not user:
+            return
+
+        adapter = get_platform_adapter(platform)
+        new_count = 0
+
+        for raw in raw_items:
+            existing = await db.execute(
+                select(Vacancy).where(
+                    Vacancy.external_id == raw["external_id"],
+                    Vacancy.platform == platform,
+                    Vacancy.user_id == user_id,
+                )
+            )
+            if existing.scalar_one_or_none():
+                continue
+
+            vacancy = Vacancy(
+                user_id=user_id,
+                platform=platform,
+                integration_mode=adapter.integration_mode if adapter else "official_api",
+                external_id=raw["external_id"],
+                hh_id=raw["external_id"] if platform == "hh" else None,
+                title=raw["title"],
+                company=raw["company"],
+                salary_from=raw.get("salary_from"),
+                salary_to=raw.get("salary_to"),
+                salary_currency=raw.get("salary_currency", "RUR"),
+                city=raw.get("city"),
+                work_format=raw.get("work_format"),
+                url=raw.get("url"),
+                status="new",
+                description=raw["description"][:2000] if raw.get("description") else None,
+                skills_required=raw.get("skills_required") or [],
+            )
+            db.add(vacancy)
+            new_count += 1
+
+            try:
+                await check_ai_rate_limit(user_id, user.plan)
+                await asyncio.sleep(HH_REQUEST_DELAY)
+                score_result = await ai_service.score_vacancy(
+                    vacancy_title=vacancy.title,
+                    company=vacancy.company,
+                    description=vacancy.description or "",
+                    skills_required=vacancy.skills_required or [],
+                    salary_from=vacancy.salary_from,
+                    salary_to=vacancy.salary_to,
+                    work_format=vacancy.work_format,
+                    user_skills=user.skills or [],
+                    user_salary_from=user.salary_from,
+                    user_salary_to=user.salary_to,
+                    user_work_formats=user.work_formats or [],
+                    user_experience=user.experience_years,
+                    target_role=getattr(user, "target_role", None),
+                    rejected_companies=getattr(user, "rejected_companies", None) or [],
+                )
+                vacancy.score = score_result.get("score")
+                vacancy.score_breakdown = score_result.get("breakdown")
+                vacancy.score_explanation = score_result.get("explanation")
+
+                threshold = getattr(user, "score_threshold", 60) or 60
+                if not score_result.get("ai_failed"):
+                    vacancy.status = "new" if (vacancy.score or 0) >= threshold else "scored"
+
+                logger.debug(
+                    "_ingest_and_score: '%s' @ %s → score=%s",
+                    vacancy.title, vacancy.company, vacancy.score,
+                )
+            except Exception:
+                logger.exception("_ingest_and_score: failed to score %s for user %s", raw["external_id"], user_id)
+
+        await db.commit()
+        logger.info("_ingest_and_score done: user=%s new=%d total=%d", user_id, new_count, len(raw_items))
