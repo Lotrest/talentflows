@@ -1,6 +1,7 @@
 import logging
 import secrets
 from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
@@ -191,7 +192,7 @@ async def platform_oauth_start(platform: str):
 async def platform_oauth_callback(
     platform: str,
     code: str,
-    state: str,
+    state: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
     adapter = get_platform_adapter(platform)
