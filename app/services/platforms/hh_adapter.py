@@ -24,7 +24,7 @@ class HHAdapter(PlatformAdapter):
             "client_id": settings.hh_client_id,
             "redirect_uri": settings.hh_redirect_uri,
             "state": state,
-            "scope": "resume vacancy negotiations",
+            "scope": "resume negotiations",
         }
         return f"{HH_AUTH_URL}?{urlencode(params)}"
 
