@@ -65,22 +65,66 @@ class SuperjobAdapter(PlatformAdapter):
                 "name": data.get("firstName", ""),
             }
 
+    def _build_queries(self, raw: str) -> list[str]:
+        clean = (raw or "").strip()
+        if len(clean) < 3:
+            clean = "разработчик"
+        first_word = clean.split()[0]
+        expanded = f"{first_word} разработчик" if first_word.lower() not in ("разработчик", "developer") else first_word
+        seen: set[str] = set()
+        result: list[str] = []
+        for q in [clean, expanded, first_word, "разработчик"]:
+            if q and q not in seen:
+                seen.add(q)
+                result.append(q)
+        return result
+
     async def search_vacancies(self, connection, user: User, query: str, per_page: int = 50) -> list[PlatformVacancy]:
-        params: dict = {
-            "keyword": query or "python",
-            "count": min(per_page, 20),
-            "page": 0,
-        }
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                f"{self._API_BASE}/vacancies/",
-                params=params,
-                headers=self._auth_headers(connection),
-            )
-            resp.raise_for_status()
-            data = resp.json()
+        queries = self._build_queries(query)
+        # 0 = вся Россия, 4 = Москва, 14 = СПб
+        towns = [0, 4, 14]
+
+        seen_ids: set[str] = set()
+        all_raw: list[dict] = []
+
+        collect_done = False
+        for q in queries:
+            if collect_done:
+                break
+            for town in towns:
+                if collect_done:
+                    break
+                for page in range(3):
+                    if len(all_raw) >= per_page * 2:
+                        collect_done = True
+                        break
+                    params: dict = {"keyword": q, "count": 20, "page": page}
+                    if town != 0:
+                        params["town"] = town
+                    try:
+                        async with httpx.AsyncClient() as client:
+                            resp = await client.get(
+                                f"{self._API_BASE}/vacancies/",
+                                params=params,
+                                headers=self._auth_headers(connection),
+                                timeout=10.0,
+                            )
+                            resp.raise_for_status()
+                            data = resp.json()
+                        page_items = data.get("objects", [])
+                        if not page_items:
+                            break
+                        for item in page_items:
+                            eid = str(item["id"])
+                            if eid not in seen_ids:
+                                seen_ids.add(eid)
+                                all_raw.append(item)
+                    except Exception as e:
+                        logger.warning("superjob search q=%r town=%s page=%s: %s", q, town, page, e)
+                        break
+
         items: list[PlatformVacancy] = []
-        for item in data.get("objects", []):
+        for item in all_raw[:per_page]:
             schedule = item.get("work_schedule", {}).get("title", "").lower()
             work_format = "remote" if "удален" in schedule else "office"
             items.append(PlatformVacancy(
