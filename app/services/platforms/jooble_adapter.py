@@ -1,4 +1,5 @@
 import logging
+import random
 import httpx
 from app.models.user import User
 from app.services.platforms.base import PlatformAdapter, PlatformVacancy, PlatformVacancyDetail, PlatformResume
@@ -54,8 +55,10 @@ class JoobleAdapter(PlatformAdapter):
         location = _resolve_location(user)
         url = f"{self._API_BASE}/{settings.jooble_api_key}"
 
+        page = random.randint(1, 5)
+
         async def _fetch(keywords: str, loc: str) -> list:
-            body = {"keywords": keywords, "location": loc, "page": 1, "resultonpage": min(per_page, 20)}
+            body = {"keywords": keywords, "location": loc, "page": page, "resultonpage": min(per_page, 20)}
             resp = await client.post(url, json=body)
             resp.raise_for_status()
             return resp.json().get("jobs") or []
