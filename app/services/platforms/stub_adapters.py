@@ -9,19 +9,19 @@ class SuperjobAdapter(PlatformAdapter):
     supports_oauth = True
 
     _OAUTH_URL = "https://www.superjob.ru/authorize/"
-    _TOKEN_URL = "https://api.superjob.ru/oauth2/access_token/"
+    _TOKEN_URL = "https://www.superjob.ru/oauth2/access_token/"
     _API_BASE = "https://api.superjob.ru/2.0"
 
     def get_oauth_url(self, state: str) -> str:
         from app.core.config import settings
+        from urllib.parse import urlencode
         params = {
             "response_type": "code",
             "client_id": settings.superjob_client_id,
             "redirect_uri": settings.superjob_redirect_uri,
             "state": state,
         }
-        query = "&".join(f"{k}={v}" for k, v in params.items())
-        return f"{self._OAUTH_URL}?{query}"
+        return f"{self._OAUTH_URL}?{urlencode(params)}"
 
     async def exchange_code(self, code: str) -> dict:
         from app.core.config import settings
