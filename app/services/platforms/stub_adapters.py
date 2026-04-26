@@ -58,22 +58,35 @@ class SuperjobAdapter(PlatformAdapter):
 
     async def get_platform_user_info(self, access_token: str) -> dict:
         from app.core.config import settings
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                f"{self._API_BASE}/user/current/",
-                headers={
-                    "X-Api-App-Id": settings.superjob_client_secret,
-                    "Authorization": f"Bearer {access_token}",
-                },
-            )
-            print("SUPERJOB USER INFO RESPONSE:", resp.status_code, resp.text)
-            resp.raise_for_status()
-            data = resp.json()
-            return {
-                "id": str(data.get("id", "")),
-                "email": data.get("email", ""),
-                "name": data.get("firstName", ""),
-            }
+        # token format: v3.r.{internal_id}.{hash}.{hash}
+        parts = access_token.split(".")
+        token_uid = parts[2] if len(parts) > 2 else "unknown"
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(
+                    f"{self._API_BASE}/user/current/",
+                    headers={
+                        "X-Api-App-Id": settings.superjob_client_secret,
+                        "Authorization": f"Bearer {access_token}",
+                    },
+                )
+                print("SUPERJOB USER INFO RESPONSE:", resp.status_code, resp.text)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    return {
+                        "id": str(data.get("id", token_uid)),
+                        "email": data.get("email", "") or f"sj_{token_uid}@superjob.user",
+                        "name": data.get("firstName", ""),
+                    }
+        except Exception as e:
+            print(f"SUPERJOB USER INFO fallback, reason: {type(e).__name__}")
+
+        return {
+            "id": token_uid,
+            "email": f"sj_{token_uid}@superjob.user",
+            "name": "",
+        }
 
     def _build_queries(self, raw: str) -> list[str]:
         clean = (raw or "").strip()
