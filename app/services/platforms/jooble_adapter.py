@@ -23,6 +23,9 @@ _CITY_TO_COUNTRY = {
     "lisbon": "Portugal",
 }
 
+# Fallback locations to broaden search when user location returns nothing
+_FALLBACK_LOCATIONS = ["Poland", "Germany", "Netherlands"]
+
 
 def _resolve_location(user: User) -> str:
     if not user.city:
@@ -34,6 +37,24 @@ def _resolve_location(user: User) -> str:
     if country:
         return country
     return user.city
+
+
+def _build_queries(raw: str) -> list[str]:
+    """Build a ranked list of query variants from user keywords."""
+    clean = (raw or "").strip()
+    if len(clean) < 3:
+        clean = "developer"
+
+    first_word = clean.split()[0]
+    expanded = f"{first_word} developer" if first_word.lower() != "developer" else "developer"
+
+    seen: set[str] = set()
+    result: list[str] = []
+    for q in [clean, expanded, first_word, "developer"]:
+        if q and q not in seen:
+            seen.add(q)
+            result.append(q)
+    return result
 
 
 class JoobleAdapter(PlatformAdapter):
@@ -52,24 +73,29 @@ class JoobleAdapter(PlatformAdapter):
         if not settings.jooble_api_key:
             return []
 
-        # Normalize query: strip extras, fall back to "developer"
-        clean_query = (query or "").strip()
-        if len(clean_query) < 3:
-            clean_query = "developer"
-        # Jooble chokes on long multi-word queries — use first meaningful word
-        first_word = clean_query.split()[0] if clean_query else "developer"
-        # Jooble is literal — "frontend" returns 0, "frontend developer" returns results
-        expanded_query = f"{first_word} developer" if first_word != "developer" else "developer"
+        queries = _build_queries(query)
+        user_location = _resolve_location(user)
 
-        location = _resolve_location(user)
+        # Unique ordered locations: user's first, then fallbacks
+        locations: list[str] = []
+        for loc in [user_location] + _FALLBACK_LOCATIONS:
+            if loc not in locations:
+                locations.append(loc)
+
         url = f"{self._API_BASE}/{settings.jooble_api_key}"
         page = random.randint(1, 5)
 
-        logger.info("Jooble search: query=%r first_word=%r expanded=%r location=%r page=%d", clean_query, first_word, expanded_query, location, page)
+        logger.info(
+            "Jooble search: queries=%r locations=%r page=%d",
+            queries, locations, page,
+        )
+
+        seen_links: set[str] = set()
+        all_raw: list[dict] = []
 
         async def _fetch(keywords: str, loc: str) -> list:
-            body = {"keywords": keywords, "location": loc, "page": page, "resultonpage": min(per_page, 20)}
-            resp = await client.post(url, json=body)
+            body = {"keywords": keywords, "location": loc, "page": page, "resultonpage": 20}
+            resp = await client.post(url, json=body, timeout=15.0)
             resp.raise_for_status()
             jobs = resp.json().get("jobs") or []
             logger.info("Jooble _fetch: keywords=%r loc=%r → %d results", keywords, loc, len(jobs))
@@ -77,24 +103,30 @@ class JoobleAdapter(PlatformAdapter):
 
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
-                jobs = await _fetch(clean_query, location)
-                if not jobs:
-                    jobs = await _fetch(expanded_query, location)
-                if not jobs:
-                    jobs = await _fetch(expanded_query, "Poland")
-                if not jobs:
-                    jobs = await _fetch("developer", "Poland")
+                for q in queries:
+                    for loc in locations:
+                        if len(all_raw) >= per_page * 2:
+                            break
+                        try:
+                            jobs = await _fetch(q, loc)
+                            for job in jobs:
+                                link = job.get("link") or ""
+                                if link and link not in seen_links:
+                                    seen_links.add(link)
+                                    all_raw.append(job)
+                        except Exception as e:
+                            logger.warning("Jooble _fetch failed q=%r loc=%r: %s", q, loc, e)
+                    if len(all_raw) >= per_page:
+                        break
         except Exception as e:
             logger.error("Jooble search failed: %s", e)
             return []
 
-        seen: set[str] = set()
+        logger.info("Jooble search done: %d unique results before trim", len(all_raw))
+
         items: list[PlatformVacancy] = []
-        for item in jobs:
+        for item in all_raw[:per_page]:
             link = item.get("link") or ""
-            if not link or link in seen:
-                continue
-            seen.add(link)
 
             salary_str: str = item.get("salary", "") or ""
             salary_from = None
