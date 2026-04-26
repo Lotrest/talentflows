@@ -121,12 +121,16 @@ class SuperjobAdapter(PlatformAdapter):
     async def get_resumes(self, connection) -> list[PlatformResume]:
         if not connection:
             return []
+        params = {}
+        if connection.platform_user_id:
+            params["user_id"] = connection.platform_user_id
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 f"{self._API_BASE}/resumes/",
+                params=params,
                 headers=self._auth_headers(connection),
             )
-            logger.info("superjob get_resumes: status=%s", resp.status_code)
+            logger.info("superjob get_resumes: status=%s user_id=%s", resp.status_code, connection.platform_user_id)
             resp.raise_for_status()
             data = resp.json()
         return [
