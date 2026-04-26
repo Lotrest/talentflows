@@ -6,7 +6,7 @@ from app.services.platforms.base import PlatformAdapter, PlatformVacancy, Platfo
 HH_API_BASE = "https://api.hh.ru"
 HH_AUTH_URL = "https://hh.ru/oauth/authorize"
 HH_TOKEN_URL = "https://hh.ru/oauth/token"
-HH_HEADERS = {"HH-User-Agent": "Applai/1.0 (akuninm2@gmail.com)"}
+HH_HEADERS = {"User-Agent": "Applai/1.0 (akuninm2@gmail.com)"}
 
 
 class HHAdapter(PlatformAdapter):
@@ -67,11 +67,7 @@ class HHAdapter(PlatformAdapter):
         query: str,
         per_page: int = 50,
     ) -> list[PlatformVacancy]:
-        # Build search query: keywords + top skills for better matching
         search_text = query
-        if user.skills:
-            top_skills = " ".join(user.skills[:5])
-            search_text = f"{query} {top_skills}".strip()
 
         params: dict = {
             "text": search_text,
