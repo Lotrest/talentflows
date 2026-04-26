@@ -66,7 +66,6 @@ class SuperjobAdapter(PlatformAdapter):
             }
 
     async def search_vacancies(self, connection, user: User, query: str, per_page: int = 50) -> list[PlatformVacancy]:
-        from app.core.config import settings
         params: dict = {
             "keyword": query or "python",
             "count": min(per_page, 20),
@@ -76,7 +75,7 @@ class SuperjobAdapter(PlatformAdapter):
             resp = await client.get(
                 f"{self._API_BASE}/vacancies/",
                 params=params,
-                headers={"X-Api-App-Id": settings.superjob_client_secret},
+                headers=self._auth_headers(connection),
             )
             resp.raise_for_status()
             data = resp.json()
@@ -97,13 +96,18 @@ class SuperjobAdapter(PlatformAdapter):
             ))
         return items
 
+    def _auth_headers(self, connection=None) -> dict:
+        from app.core.config import settings
+        h = {"X-Api-App-Id": settings.superjob_client_secret}
+        if connection and connection.access_token:
+            h["Authorization"] = f"Bearer {connection.access_token}"
+        return h
+
     async def get_vacancy_detail(self, connection, external_id: str) -> PlatformVacancyDetail:
-        if not connection:
-            return PlatformVacancyDetail()
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 f"{self._API_BASE}/vacancies/{external_id}/",
-                headers={"Authorization": f"Bearer {connection.access_token}"},
+                headers=self._auth_headers(connection),
             )
             resp.raise_for_status()
             data = resp.json()
@@ -119,9 +123,10 @@ class SuperjobAdapter(PlatformAdapter):
             return []
         async with httpx.AsyncClient() as client:
             resp = await client.get(
-                f"{self._API_BASE}/candidates/resumes/",
-                headers={"Authorization": f"Bearer {connection.access_token}"},
+                f"{self._API_BASE}/resumes/",
+                headers=self._auth_headers(connection),
             )
+            logger.info("superjob get_resumes: status=%s", resp.status_code)
             resp.raise_for_status()
             data = resp.json()
         return [
@@ -143,7 +148,7 @@ class SuperjobAdapter(PlatformAdapter):
             resp = await client.post(
                 f"{self._API_BASE}/responses/",
                 json={"vacancy_id": int(vacancy_id), "resume_id": int(resume_id), "text": cover_letter},
-                headers={"Authorization": f"Bearer {connection.access_token}"},
+                headers=self._auth_headers(connection),
             )
             logger.info("superjob apply_to_vacancy: status=%s vacancy=%s resume=%s", resp.status_code, vacancy_id, resume_id)
             resp.raise_for_status()
