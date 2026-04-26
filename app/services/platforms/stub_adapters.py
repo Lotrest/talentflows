@@ -36,6 +36,7 @@ class SuperjobAdapter(PlatformAdapter):
                 "code": code,
                 "redirect_uri": settings.superjob_redirect_uri,
             })
+            print("SUPERJOB TOKEN RESPONSE:", resp.status_code, resp.text)
             resp.raise_for_status()
             return resp.json()
 
@@ -57,6 +58,7 @@ class SuperjobAdapter(PlatformAdapter):
                 f"{self._API_BASE}/user/current/",
                 headers={"Authorization": f"Bearer {access_token}"},
             )
+            print("SUPERJOB USER INFO RESPONSE:", resp.status_code, resp.text)
             resp.raise_for_status()
             data = resp.json()
             return {
