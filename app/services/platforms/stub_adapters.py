@@ -33,13 +33,12 @@ class SuperjobAdapter(PlatformAdapter):
                 self._TOKEN_URL,
                 data={
                     "grant_type": "authorization_code",
-                    "code": code,
+                    "client_id": settings.superjob_client_id,
+                    "client_secret": settings.superjob_client_secret,
                     "redirect_uri": settings.superjob_redirect_uri,
+                    "code": code,
                 },
-                headers={
-                    "X-Api-App-Id": settings.superjob_client_secret,
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
             print("SUPERJOB TOKEN RESPONSE:", resp.status_code, resp.text)
             resp.raise_for_status()
