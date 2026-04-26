@@ -76,11 +76,12 @@ class HHAdapter(PlatformAdapter):
             "per_page": 20,
         }
 
+        auth_headers = {"Authorization": f"Bearer {connection.access_token}", **HH_HEADERS} if connection and connection.access_token else HH_HEADERS
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 f"{HH_API_BASE}/vacancies",
                 params=params,
-                headers=HH_HEADERS,
+                headers=auth_headers,
             )
             logger.info("HH /vacancies status=%s url=%s", resp.status_code, resp.url)
             if not resp.is_success:
