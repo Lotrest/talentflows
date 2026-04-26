@@ -12,7 +12,7 @@ class SuperjobAdapter(PlatformAdapter):
     supports_oauth = True
 
     _OAUTH_URL = "https://www.superjob.ru/authorize/"
-    _TOKEN_URL = "https://api.superjob.ru/2.0/oauth2/access_token"
+    _TOKEN_URL = "https://api.superjob.ru/2.0/oauth2/token/"
     _API_BASE = "https://api.superjob.ru/2.0"
 
     def get_oauth_url(self, state: str) -> str:
@@ -29,13 +29,17 @@ class SuperjobAdapter(PlatformAdapter):
     async def exchange_code(self, code: str) -> dict:
         from app.core.config import settings
         async with httpx.AsyncClient() as client:
-            resp = await client.post(self._TOKEN_URL, data={
-                "grant_type": "authorization_code",
-                "client_id": settings.superjob_client_id,
-                "client_secret": settings.superjob_client_secret,
-                "code": code,
-                "redirect_uri": settings.superjob_redirect_uri,
-            })
+            resp = await client.post(
+                self._TOKEN_URL,
+                data={
+                    "grant_type": "authorization_code",
+                    "client_id": settings.superjob_client_id,
+                    "client_secret": settings.superjob_client_secret,
+                    "code": code,
+                    "redirect_uri": settings.superjob_redirect_uri,
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
             print("SUPERJOB TOKEN RESPONSE:", resp.status_code, resp.text)
             resp.raise_for_status()
             return resp.json()
