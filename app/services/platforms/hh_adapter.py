@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 from app.models.user import User
 from app.services.platforms.base import PlatformAdapter, PlatformVacancy, PlatformVacancyDetail, PlatformResume
 
-HH_API_BASE = "https://hh-proxy.akuninm2.workers.dev"
+HH_API_BASE = "https://api.hh.ru"
 HH_AUTH_URL = "https://hh.ru/oauth/authorize"
 HH_TOKEN_URL = "https://hh.ru/oauth/token"
 HH_HEADERS = {"HH-User-Agent": "TalentFlows/1.0 (akuninm2@gmail.com)"}
