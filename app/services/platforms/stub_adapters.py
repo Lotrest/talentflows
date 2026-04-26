@@ -12,7 +12,7 @@ class SuperjobAdapter(PlatformAdapter):
     supports_oauth = True
 
     _OAUTH_URL = "https://www.superjob.ru/authorize/"
-    _TOKEN_URL = "https://www.superjob.ru/oauth2/token/"
+    _TOKEN_URL = "https://api.superjob.ru/2.0/oauth2/access_token/"
     _API_BASE = "https://api.superjob.ru/2.0"
 
     def get_oauth_url(self, state: str) -> str:
@@ -33,12 +33,13 @@ class SuperjobAdapter(PlatformAdapter):
                 self._TOKEN_URL,
                 data={
                     "grant_type": "authorization_code",
-                    "client_id": settings.superjob_client_id,
-                    "client_secret": settings.superjob_client_secret,
                     "code": code,
                     "redirect_uri": settings.superjob_redirect_uri,
                 },
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                headers={
+                    "X-Api-App-Id": settings.superjob_client_secret,
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
             )
             print("SUPERJOB TOKEN RESPONSE:", resp.status_code, resp.text)
             resp.raise_for_status()
@@ -57,10 +58,14 @@ class SuperjobAdapter(PlatformAdapter):
             return resp.json()
 
     async def get_platform_user_info(self, access_token: str) -> dict:
+        from app.core.config import settings
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 f"{self._API_BASE}/user/current/",
-                headers={"Authorization": f"Bearer {access_token}"},
+                headers={
+                    "X-Api-App-Id": settings.superjob_client_secret,
+                    "Authorization": f"Bearer {access_token}",
+                },
             )
             print("SUPERJOB USER INFO RESPONSE:", resp.status_code, resp.text)
             resp.raise_for_status()
