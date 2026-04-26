@@ -9,7 +9,7 @@ from app.services.platforms.base import PlatformAdapter, PlatformVacancy, Platfo
 HH_API_BASE = "https://api.hh.ru"
 HH_AUTH_URL = "https://hh.ru/oauth/authorize"
 HH_TOKEN_URL = "https://hh.ru/oauth/token"
-HH_HEADERS = {"HH-User-Agent": "Applai/1.0 (akuninm2@gmail.com)"}
+HH_HEADERS = {"HH-User-Agent": "TalentFlows/1.0 (akuninm2@gmail.com)"}
 
 
 class HHAdapter(PlatformAdapter):
