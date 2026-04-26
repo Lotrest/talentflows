@@ -80,6 +80,8 @@ class HHAdapter(PlatformAdapter):
         if connection and connection.access_token:
             auth_headers["Authorization"] = f"Bearer {connection.access_token}"
 
+        logger.info("HH search headers keys: %s, has_token: %s", list(auth_headers.keys()), "Authorization" in auth_headers)
+
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 f"{HH_API_BASE}/vacancies",
