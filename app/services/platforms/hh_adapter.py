@@ -73,7 +73,7 @@ class HHAdapter(PlatformAdapter):
         params: dict = {
             "text": query or "python",
             "area": 1,
-            "per_page": 20,
+            "per_page": 5,  # TODO: временно, убрать после тестов
         }
 
         async with httpx.AsyncClient() as client:
