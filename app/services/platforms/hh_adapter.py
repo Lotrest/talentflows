@@ -105,7 +105,7 @@ class HHAdapter(PlatformAdapter):
             resp = await client.get(
                 f"{HH_API_BASE}/vacancies",
                 params=params,
-                headers={"Authorization": f"Bearer {connection.access_token}", **HH_HEADERS},
+                headers=HH_HEADERS,
             )
             resp.raise_for_status()
             data = resp.json()
