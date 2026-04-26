@@ -15,15 +15,15 @@ class HHAdapter(PlatformAdapter):
     supports_oauth = True
 
     def get_oauth_url(self, state: str) -> str:
+        from urllib.parse import urlencode
         params = {
             "response_type": "code",
             "client_id": settings.hh_client_id,
             "redirect_uri": settings.hh_redirect_uri,
             "state": state,
-            "scope": "resume vacancy_response",
+            "scope": "resume",
         }
-        query = "&".join(f"{k}={v}" for k, v in params.items())
-        return f"{HH_AUTH_URL}?{query}"
+        return f"{HH_AUTH_URL}?{urlencode(params)}"
 
     async def exchange_code(self, code: str) -> dict:
         async with httpx.AsyncClient() as client:
