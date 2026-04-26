@@ -226,6 +226,12 @@ async def _scan_and_score(user_id: str, platform: str):
                 status="new",
             )
             db.add(vacancy)
+            new_count += 1
+
+            # Jooble returns no descriptions/skills — AI scoring is useless, skip it
+            if platform == "jooble":
+                logger.debug("_scan_and_score: jooble vacancy saved without scoring '%s'", vacancy.title)
+                continue
 
             try:
                 await check_ai_rate_limit(user_id, user.plan)
@@ -260,7 +266,6 @@ async def _scan_and_score(user_id: str, platform: str):
                 if not score_result.get("ai_failed"):
                     vacancy.status = "new" if (vacancy.score or 0) >= threshold else "scored"
 
-                new_count += 1
                 logger.debug(
                     "_scan_and_score: '%s' @ %s → score=%s status=%s",
                     vacancy.title, vacancy.company, vacancy.score, vacancy.status,
