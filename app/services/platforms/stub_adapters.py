@@ -1,6 +1,9 @@
+import logging
 import httpx
 from app.models.user import User
 from app.services.platforms.base import PlatformAdapter, PlatformVacancy, PlatformVacancyDetail, PlatformResume
+
+logger = logging.getLogger(__name__)
 
 
 class SuperjobAdapter(PlatformAdapter):
@@ -131,6 +134,20 @@ class SuperjobAdapter(PlatformAdapter):
             )
             for r in data.get("objects", [])
         ]
+
+    async def apply_to_vacancy(self, connection, vacancy_id: str, resume_id: str, cover_letter: str) -> dict:
+        if not connection or not resume_id:
+            logger.warning("superjob apply_to_vacancy: missing connection or resume_id")
+            return {}
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"{self._API_BASE}/responses/",
+                json={"vacancy_id": int(vacancy_id), "resume_id": int(resume_id), "text": cover_letter},
+                headers={"Authorization": f"Bearer {connection.access_token}"},
+            )
+            logger.info("superjob apply_to_vacancy: status=%s vacancy=%s resume=%s", resp.status_code, vacancy_id, resume_id)
+            resp.raise_for_status()
+            return resp.json()
 
 
 class RabotaRuAdapter(PlatformAdapter):

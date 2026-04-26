@@ -123,7 +123,10 @@ async def apply_to_vacancy(
                 )
                 platform_application_id = str(api_result.get("id", "")) or None
             except Exception:
-                pass
+                logger.exception(
+                    "apply_to_vacancy failed: platform=%s vacancy=%s resume=%s",
+                    vacancy.platform, vacancy.external_id, resume_id,
+                )
 
     application = Application(
         user_id=current_user.id,
