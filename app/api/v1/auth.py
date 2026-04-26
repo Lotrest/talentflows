@@ -223,6 +223,7 @@ async def platform_oauth_callback(
 
     jwt_token = create_access_token(user.id)
     redirect_url = f"{settings.frontend_url}/onboarding?token={jwt_token}"
+    print("REDIRECT TO:", redirect_url)
     return RedirectResponse(url=redirect_url)
 
 
