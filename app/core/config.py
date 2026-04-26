@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     # HH.ru
     hh_client_id: str = ""
     hh_client_secret: str = ""
-    hh_redirect_uri: str = "http://localhost:8000/api/v1/auth/hh/callback"
+    hh_redirect_uri: str = "https://api.talentflows.ru/api/v1/auth/hh/callback"
 
     # Superjob
     superjob_client_id: str = ""
