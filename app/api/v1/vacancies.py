@@ -254,9 +254,11 @@ async def _scan_and_score(user_id: str, platform: str):
                 vacancy.score_breakdown = score_result.get("breakdown")
                 vacancy.score_explanation = score_result.get("explanation")
 
-                # State machine: SCORED → NEW only if above user threshold
+                # Only hide below threshold when AI actually scored it.
+                # If AI was unavailable (ai_failed=True), keep status "new" so vacancies stay visible.
                 threshold = getattr(user, "score_threshold", 60) or 60
-                vacancy.status = "new" if (vacancy.score or 0) >= threshold else "scored"
+                if not score_result.get("ai_failed"):
+                    vacancy.status = "new" if (vacancy.score or 0) >= threshold else "scored"
 
                 new_count += 1
                 logger.debug(

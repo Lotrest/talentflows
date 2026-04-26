@@ -178,7 +178,6 @@ async def score_vacancy(
         return result
     except Exception:
         logger.exception("score_vacancy: AI call failed for '%s'", vacancy_title)
-        # Fallback: compute basic score from skill overlap
         fallback_score = int(skill_overlap * 70)
         return {
             "score": fallback_score,
@@ -186,6 +185,7 @@ async def score_vacancy(
             "explanation": "Оценка рассчитана по совпадению навыков (AI недоступен).",
             "recommended": fallback_score >= 60,
             "red_flags": [],
+            "ai_failed": True,
         }
 
 
