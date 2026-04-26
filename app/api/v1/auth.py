@@ -207,6 +207,7 @@ async def platform_oauth_callback(
     try:
         platform_user = await adapter.get_platform_user_info(token_data["access_token"])
     except Exception as e:
+        print(f"USER INFO ERROR type={type(e).__name__} str={str(e)!r} token_data={token_data}")
         raise HTTPException(status_code=400, detail=f"Failed to get {platform} user info: {e}")
 
     email = platform_user["email"]
