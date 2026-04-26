@@ -70,18 +70,51 @@ class HHAdapter(PlatformAdapter):
         query: str,
         per_page: int = 50,
     ) -> list[PlatformVacancy]:
-        params: dict = {
-            "text": query or "python",
-            "area": 1,
-            "per_page": 5,  # TODO: временно, убрать после тестов
-        }
-
         auth_headers = {**HH_HEADERS}
         if connection and connection.access_token:
             auth_headers["Authorization"] = f"Bearer {connection.access_token}"
 
-        logger.info("HH search headers keys: %s, has_token: %s", list(auth_headers.keys()), "Authorization" in auth_headers)
+        schedule_map = {"remote": "remote", "fullDay": "office", "flexible": "hybrid", "shift": "office"}
 
+        # Try suitable_vacancies endpoint first (requires auth, bypasses IP restrictions on public search)
+        if "Authorization" in auth_headers:
+            resumes = await self.get_resumes(connection)
+            if resumes:
+                resume_id = resumes[0].id
+                logger.info("HH: using suitable_vacancies for resume=%s", resume_id)
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(
+                        f"{HH_API_BASE}/resumes/{resume_id}/suitable_vacancies",
+                        params={"per_page": min(per_page, 50)},
+                        headers=auth_headers,
+                    )
+                    logger.info("HH /suitable_vacancies status=%s", resp.status_code)
+                    if resp.is_success:
+                        data = resp.json()
+                        items: list[PlatformVacancy] = []
+                        for item in data.get("items", []):
+                            salary = item.get("salary") or {}
+                            schedule_id = item.get("schedule", {}).get("id", "")
+                            items.append(PlatformVacancy(
+                                external_id=item["id"],
+                                title=item.get("name", ""),
+                                company=item.get("employer", {}).get("name", ""),
+                                salary_from=salary.get("from"),
+                                salary_to=salary.get("to"),
+                                salary_currency=salary.get("currency", "RUR"),
+                                city=item.get("area", {}).get("name"),
+                                work_format=schedule_map.get(schedule_id),
+                                url=item.get("alternate_url"),
+                            ))
+                        return items
+                    logger.warning("HH suitable_vacancies failed: %s %s", resp.status_code, resp.text)
+
+        # Fallback: public vacancy search
+        params: dict = {
+            "text": query or "python",
+            "area": 1,
+            "per_page": min(per_page, 50),
+        }
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 f"{HH_API_BASE}/vacancies",
@@ -94,8 +127,7 @@ class HHAdapter(PlatformAdapter):
                 resp.raise_for_status()
             data = resp.json()
 
-        schedule_map = {"remote": "remote", "fullDay": "office", "flexible": "hybrid", "shift": "office"}
-        items: list[PlatformVacancy] = []
+        items = []
         for item in data.get("items", []):
             salary = item.get("salary") or {}
             schedule_id = item.get("schedule", {}).get("id", "")
