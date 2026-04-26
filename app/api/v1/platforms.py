@@ -33,6 +33,7 @@ async def list_platforms(
         meta = _PLATFORM_META.get(key, {})
         connection = connections.get(key)
         connected = await adapter.is_connected(connection)
+        saved_resume_id = (connection.meta or {}).get("resume_id") if connection else None
         result.append({
             "key": key,
             "name": meta.get("name", key),
@@ -40,6 +41,7 @@ async def list_platforms(
             "integration_mode": adapter.integration_mode,
             "supports_oauth": adapter.supports_oauth,
             "connected": connected,
+            "saved_resume_id": saved_resume_id,
         })
     result.sort(key=lambda x: x["phase"])
     return result

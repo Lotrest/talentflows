@@ -114,6 +114,17 @@ async def apply_to_vacancy(
             if adapter.supports_oauth:
                 await ensure_fresh_token(connection, adapter, db)
             resume_id = (connection.meta or {}).get("resume_id", "")
+            if not resume_id:
+                try:
+                    platform_resumes = await adapter.get_resumes(connection)
+                    if platform_resumes:
+                        resume_id = platform_resumes[0].id
+                        logger.info(
+                            "apply fallback: no saved resume_id, using first resume=%s platform=%s",
+                            resume_id, vacancy.platform,
+                        )
+                except Exception:
+                    logger.warning("apply fallback: failed to fetch resumes for platform=%s", vacancy.platform)
             try:
                 api_result = await adapter.apply_to_vacancy(
                     connection=connection,
