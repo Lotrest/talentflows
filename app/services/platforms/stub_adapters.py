@@ -9,7 +9,7 @@ class SuperjobAdapter(PlatformAdapter):
     supports_oauth = True
 
     _OAUTH_URL = "https://www.superjob.ru/authorize/"
-    _TOKEN_URL = "https://www.superjob.ru/oauth2/access_token/"
+    _TOKEN_URL = "https://api.superjob.ru/2.0/oauth2/access_token"
     _API_BASE = "https://api.superjob.ru/2.0"
 
     def get_oauth_url(self, state: str) -> str:
