@@ -76,11 +76,15 @@ class HHAdapter(PlatformAdapter):
             "per_page": 5,  # TODO: временно, убрать после тестов
         }
 
+        auth_headers = {**HH_HEADERS}
+        if connection and connection.access_token:
+            auth_headers["Authorization"] = f"Bearer {connection.access_token}"
+
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 f"{HH_API_BASE}/vacancies",
                 params=params,
-                headers=HH_HEADERS,
+                headers=auth_headers,
             )
             logger.info("HH /vacancies status=%s url=%s", resp.status_code, resp.url)
             if not resp.is_success:
@@ -107,10 +111,14 @@ class HHAdapter(PlatformAdapter):
         return items
 
     async def get_vacancy_detail(self, connection, external_id: str) -> PlatformVacancyDetail:
+        detail_headers = {**HH_HEADERS}
+        if connection and connection.access_token:
+            detail_headers["Authorization"] = f"Bearer {connection.access_token}"
+
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 f"{HH_API_BASE}/vacancies/{external_id}",
-                headers=HH_HEADERS,
+                headers=detail_headers,
             )
             if not resp.is_success:
                 logger.error("HH /vacancies/%s error: %s", external_id, resp.text)
