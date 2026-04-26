@@ -1,7 +1,10 @@
+import logging
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.platform_connection import PlatformConnection
 from app.services.platforms.base import PlatformAdapter
+
+logger = logging.getLogger(__name__)
 
 
 async def ensure_fresh_token(
@@ -33,7 +36,11 @@ async def ensure_fresh_token(
         connection.expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
         await db.commit()
     except Exception:
-        pass
+        logger.exception(
+            "Token refresh failed for platform=%s user=%s — token may be expired, user needs to reconnect",
+            getattr(connection, "platform", "?"),
+            getattr(connection, "user_id", "?"),
+        )
 
     return connection.access_token
 
