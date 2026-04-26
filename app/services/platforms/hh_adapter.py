@@ -76,17 +76,16 @@ class HHAdapter(PlatformAdapter):
             "per_page": 20,
         }
 
-        auth_headers = {"Authorization": f"Bearer {connection.access_token}", **HH_HEADERS} if connection and connection.access_token else HH_HEADERS
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 f"{HH_API_BASE}/vacancies",
                 params=params,
-                headers=auth_headers,
+                headers=HH_HEADERS,
             )
             logger.info("HH /vacancies status=%s url=%s", resp.status_code, resp.url)
             if not resp.is_success:
                 logger.error("HH /vacancies error body: %s", resp.text)
-            resp.raise_for_status()
+                resp.raise_for_status()
             data = resp.json()
 
         schedule_map = {"remote": "remote", "fullDay": "office", "flexible": "hybrid", "shift": "office"}
@@ -111,9 +110,11 @@ class HHAdapter(PlatformAdapter):
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 f"{HH_API_BASE}/vacancies/{external_id}",
-                headers={"Authorization": f"Bearer {connection.access_token}", **HH_HEADERS},
+                headers=HH_HEADERS,
             )
-            resp.raise_for_status()
+            if not resp.is_success:
+                logger.error("HH /vacancies/%s error: %s", external_id, resp.text)
+                resp.raise_for_status()
             detail = resp.json()
         return PlatformVacancyDetail(
             description=detail.get("description", "") or "",
@@ -126,6 +127,7 @@ class HHAdapter(PlatformAdapter):
                 f"{HH_API_BASE}/resumes/mine",
                 headers={"Authorization": f"Bearer {connection.access_token}", **HH_HEADERS},
             )
+            logger.info("HH get_resumes status=%s body=%s", resp.status_code, resp.text)
             resp.raise_for_status()
             data = resp.json()
         return [
