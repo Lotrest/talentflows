@@ -1,5 +1,8 @@
+import logging
 import httpx
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 from app.models.user import User
 from app.services.platforms.base import PlatformAdapter, PlatformVacancy, PlatformVacancyDetail, PlatformResume
 
@@ -67,35 +70,11 @@ class HHAdapter(PlatformAdapter):
         query: str,
         per_page: int = 50,
     ) -> list[PlatformVacancy]:
-        search_text = query
-
         params: dict = {
-            "text": search_text,
-            "area": "1",
-            "per_page": per_page,
-            "page": 0,
-            "only_with_salary": "false",
+            "text": query or "python",
+            "area": 1,
+            "per_page": 20,
         }
-        if user.salary_from:
-            params["salary"] = user.salary_from
-            params["only_with_salary"] = "true"
-
-        # Map user experience to HH experience filter
-        exp_years = user.experience_years or 0
-        if exp_years == 0:
-            params["experience"] = "noExperience"
-        elif exp_years < 3:
-            params["experience"] = "between1And3"
-        elif exp_years < 6:
-            params["experience"] = "between3And6"
-        else:
-            params["experience"] = "moreThan6"
-
-        # Map work formats to HH schedule filter (pick first preferred)
-        fmt_map = {"remote": "remote", "office": "fullDay", "hybrid": "flexible"}
-        formats = user.work_formats or []
-        if formats and formats[0] in fmt_map:
-            params["schedule"] = fmt_map[formats[0]]
 
         async with httpx.AsyncClient() as client:
             resp = await client.get(
@@ -103,6 +82,9 @@ class HHAdapter(PlatformAdapter):
                 params=params,
                 headers=HH_HEADERS,
             )
+            logger.info("HH /vacancies status=%s url=%s", resp.status_code, resp.url)
+            if not resp.is_success:
+                logger.error("HH /vacancies error body: %s", resp.text)
             resp.raise_for_status()
             data = resp.json()
 
