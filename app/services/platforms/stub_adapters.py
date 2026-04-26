@@ -63,20 +63,17 @@ class SuperjobAdapter(PlatformAdapter):
             }
 
     async def search_vacancies(self, connection, user: User, query: str, per_page: int = 50) -> list[PlatformVacancy]:
-        if not connection:
-            return []
+        from app.core.config import settings
         params: dict = {
-            "keyword": query,
-            "count": min(per_page, 100),
+            "keyword": query or "python",
+            "count": min(per_page, 20),
             "page": 0,
         }
-        if user.salary_from:
-            params["payment_from"] = user.salary_from
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 f"{self._API_BASE}/vacancies/",
                 params=params,
-                headers={"Authorization": f"Bearer {connection.access_token}"},
+                headers={"X-Api-App-Id": settings.superjob_client_secret},
             )
             resp.raise_for_status()
             data = resp.json()
