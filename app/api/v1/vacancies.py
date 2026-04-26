@@ -184,11 +184,14 @@ async def _scan_and_score(user_id: str, platform: str):
         if adapter.supports_oauth and connection:
             await ensure_fresh_token(connection, adapter, db)
 
+        raw_query = (user.keywords or "").strip()
+        logger.info("_scan_and_score: query=%r platform=%s user=%s", raw_query, platform, user_id)
+
         try:
             items = await adapter.search_vacancies(
                 connection=connection,
                 user=user,
-                query=user.keywords or "",
+                query=raw_query,
                 per_page=50,
             )
         except Exception:

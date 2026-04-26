@@ -52,22 +52,34 @@ class JoobleAdapter(PlatformAdapter):
         if not settings.jooble_api_key:
             return []
 
+        # Normalize query: strip extras, fall back to "developer"
+        clean_query = (query or "").strip()
+        if len(clean_query) < 3:
+            clean_query = "developer"
+        # Jooble chokes on long multi-word queries — use first meaningful word
+        first_word = clean_query.split()[0] if clean_query else "developer"
+
         location = _resolve_location(user)
         url = f"{self._API_BASE}/{settings.jooble_api_key}"
-
         page = random.randint(1, 5)
+
+        logger.info("Jooble search: query=%r first_word=%r location=%r page=%d", clean_query, first_word, location, page)
 
         async def _fetch(keywords: str, loc: str) -> list:
             body = {"keywords": keywords, "location": loc, "page": page, "resultonpage": min(per_page, 20)}
             resp = await client.post(url, json=body)
             resp.raise_for_status()
-            return resp.json().get("jobs") or []
+            jobs = resp.json().get("jobs") or []
+            logger.info("Jooble _fetch: keywords=%r loc=%r → %d results", keywords, loc, len(jobs))
+            return jobs
 
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
-                jobs = await _fetch(query or "developer", location)
+                jobs = await _fetch(clean_query, location)
                 if not jobs:
-                    jobs = await _fetch(query or "developer", "Poland")
+                    jobs = await _fetch(first_word, location)
+                if not jobs:
+                    jobs = await _fetch(first_word, "Poland")
                 if not jobs:
                     jobs = await _fetch("developer", "Poland")
         except Exception as e:
