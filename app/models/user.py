@@ -41,6 +41,11 @@ class User(Base):
     target_role: Mapped[str | None] = mapped_column(String)             # "Python разработчик", "Data Engineer"
     rejected_companies: Mapped[list] = mapped_column(JSON, default=list) # companies user always skips
 
+    # Resume
+    resume_filename: Mapped[str | None] = mapped_column(String, nullable=True)
+    resume_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    resume_uploaded_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # Email/password auth
     hashed_password: Mapped[str | None] = mapped_column(String)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)

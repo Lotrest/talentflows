@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
+from typing import Optional
 
 
 class UserProfile(BaseModel):
@@ -53,6 +54,14 @@ class UserProfileOut(UserOut):
     include_salary: bool = True
     personalize: bool = True
     custom_instructions: str | None = None
+    resume: Optional["ResumeInfo"] = None
+
+
+class ResumeInfo(BaseModel):
+    filename: str
+    uploaded_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 class TokenOut(BaseModel):
