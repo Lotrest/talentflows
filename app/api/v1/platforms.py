@@ -100,28 +100,12 @@ async def fetch_hh_vacancies(
     db: AsyncSession = Depends(get_db),
 ):
     """Proxy HH vacancy search server-side to avoid CORS and browser IP blocks."""
-    conn_result = await db.execute(
-        select(PlatformConnection).where(
-            PlatformConnection.user_id == current_user.id,
-            PlatformConnection.platform == "hh",
-        )
-    )
-    conn = conn_result.scalar_one_or_none()
-    if not conn or not conn.access_token:
-        raise HTTPException(status_code=404, detail="HH not connected")
-
-    adapter = get_platform_adapter("hh")
-    await ensure_fresh_token(conn, adapter, db)
-
     keywords = current_user.keywords or "разработчик"
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.get(
             "https://api.hh.ru/vacancies",
             params={"text": keywords, "area": "113", "per_page": "50"},
-            headers={
-                "Authorization": f"Bearer {conn.access_token}",
-                "HH-User-Agent": "TalentFlows/1.0 (akuninm2@gmail.com)",
-            },
+            headers={"HH-User-Agent": "TalentFlows/1.0 (akuninm2@gmail.com)"},
         )
 
     if not resp.is_success:
