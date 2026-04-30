@@ -114,24 +114,21 @@ class HHAdapter(PlatformAdapter):
                         return items
                     logger.warning("HH suitable_vacancies failed: %s %s", resp.status_code, resp.text)
 
-        # Fallback: public vacancy search
+        # Fallback: public vacancy search — no auth header, HH rejects applicant tokens on this endpoint
         params: dict = {
             "text": query or "python",
             "area": 1,
             "per_page": min(per_page, 50),
         }
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.get(
                 f"{HH_API_BASE}/vacancies",
                 params=params,
-                headers=auth_headers,
+                headers=HH_HEADERS,
             )
             logger.info("HH /vacancies status=%s url=%s", resp.status_code, resp.url)
-            if resp.status_code == 403:
-                logger.warning("HH /vacancies 403 — Railway IP blocked, returning empty. Use a proxy or Russian hosting to fix.")
-                return []
             if not resp.is_success:
-                logger.error("HH /vacancies error body: %s", resp.text)
+                logger.error("HH /vacancies error %s body: %s", resp.status_code, resp.text)
                 resp.raise_for_status()
             data = resp.json()
 
