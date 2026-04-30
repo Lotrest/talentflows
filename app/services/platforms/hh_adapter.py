@@ -170,6 +170,20 @@ class HHAdapter(PlatformAdapter):
         )
 
     async def get_resumes(self, connection) -> list[PlatformResume]:
+        # If user manually set resume_id in settings — return it without hitting HH API
+        # (HH blocks /resumes/mine from server IPs unless app is a verified partner)
+        meta = getattr(connection, "meta", None) or {}
+        manual_resume_id = meta.get("resume_id", "").strip() if meta else ""
+        if manual_resume_id:
+            logger.info("HH get_resumes: using manual resume_id=%s from meta", manual_resume_id)
+            return [PlatformResume(
+                id=manual_resume_id,
+                title=meta.get("resume_title") or "Моё резюме",
+                status="",
+                url=f"https://hh.ru/resume/{manual_resume_id}",
+                updated_at="",
+            )]
+
         token = connection.access_token if connection else None
         logger.info("HH get_resumes: token_present=%s token_prefix=%s", bool(token), (token or "")[:10])
         try:

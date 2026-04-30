@@ -55,6 +55,7 @@ class UserProfileOut(UserOut):
     personalize: bool = True
     custom_instructions: str | None = None
     resume: Optional["ResumeInfo"] = None
+    hh_resume_id: str | None = None
 
 
 class ResumeInfo(BaseModel):

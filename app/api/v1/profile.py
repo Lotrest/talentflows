@@ -26,13 +26,22 @@ MAX_RESUME_SIZE = 5 * 1024 * 1024  # 5 MB
 
 
 @router.get("", response_model=UserProfileOut)
-async def get_profile(current_user: User = Depends(get_current_user)):
+async def get_profile(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     data = UserProfileOut.model_validate(current_user)
     if current_user.resume_filename and current_user.resume_uploaded_at:
         data.resume = ResumeInfo(
             filename=current_user.resume_filename,
             uploaded_at=current_user.resume_uploaded_at,
         )
+    conn_result = await db.execute(
+        select(PlatformConnection).where(
+            PlatformConnection.user_id == current_user.id,
+            PlatformConnection.platform == "hh",
+        )
+    )
+    hh_conn = conn_result.scalar_one_or_none()
+    if hh_conn and hh_conn.meta:
+        data.hh_resume_id = hh_conn.meta.get("resume_id") or None
     return data
 
 
