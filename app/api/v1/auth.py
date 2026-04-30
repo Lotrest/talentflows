@@ -202,7 +202,8 @@ async def platform_oauth_callback(
     try:
         token_data = await adapter.exchange_code(code)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to exchange {platform} code: {e}")
+        logger.error("exchange_code failed: platform=%s type=%s repr=%s", platform, type(e).__name__, repr(e))
+        raise HTTPException(status_code=400, detail=f"Failed to exchange {platform} code: {type(e).__name__}: {e}")
 
     try:
         platform_user = await adapter.get_platform_user_info(token_data["access_token"])

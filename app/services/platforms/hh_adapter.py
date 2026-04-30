@@ -37,6 +37,7 @@ class HHAdapter(PlatformAdapter):
                 "code": code,
                 "redirect_uri": settings.hh_redirect_uri,
             })
+            logger.info("HH exchange_code status=%s body=%s", resp.status_code, resp.text)
             resp.raise_for_status()
             return resp.json()
 
@@ -114,7 +115,7 @@ class HHAdapter(PlatformAdapter):
                         return items
                     logger.warning("HH suitable_vacancies failed: %s %s", resp.status_code, resp.text)
 
-        # Fallback: public vacancy search — no auth header, HH rejects applicant tokens on this endpoint
+        # Fallback: vacancy search — use auth token if available (server IPs get 403 without it)
         params: dict = {
             "text": query or "python",
             "area": 1,
@@ -124,7 +125,7 @@ class HHAdapter(PlatformAdapter):
             resp = await client.get(
                 f"{HH_API_BASE}/vacancies",
                 params=params,
-                headers=HH_HEADERS,
+                headers=auth_headers,
             )
             logger.info("HH /vacancies status=%s url=%s", resp.status_code, resp.url)
             if not resp.is_success:
