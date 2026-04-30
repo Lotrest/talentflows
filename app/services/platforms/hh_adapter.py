@@ -170,14 +170,20 @@ class HHAdapter(PlatformAdapter):
         )
 
     async def get_resumes(self, connection) -> list[PlatformResume]:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                f"{HH_API_BASE}/resumes/mine",
-                headers={"Authorization": f"Bearer {connection.access_token}", **HH_HEADERS},
-            )
-            logger.info("HH get_resumes status=%s body=%s", resp.status_code, resp.text)
-            resp.raise_for_status()
-            data = resp.json()
+        token = connection.access_token if connection else None
+        logger.info("HH get_resumes: token_present=%s token_prefix=%s", bool(token), (token or "")[:10])
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.get(
+                    f"{HH_API_BASE}/resumes/mine",
+                    headers={"Authorization": f"Bearer {token}", **HH_HEADERS},
+                )
+                logger.info("HH get_resumes status=%s body=%s", resp.status_code, resp.text)
+                resp.raise_for_status()
+                data = resp.json()
+        except Exception as e:
+            logger.error("HH get_resumes exception: type=%s repr=%s", type(e).__name__, repr(e))
+            raise
         return [
             PlatformResume(
                 id=r["id"],
